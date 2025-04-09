@@ -29,8 +29,8 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Log when component receives new transcript data
   useEffect(() => {
-    console.log("TranscriptViewer received transcript data:", transcript.length, "segments");
-    if (transcript.length > 0) {
+    console.log("TranscriptViewer received transcript data:", transcript?.length, "segments");
+    if (transcript && transcript.length > 0) {
       console.log("First segment in TranscriptViewer:", JSON.stringify(transcript[0]));
     }
   }, [transcript]);
