@@ -30,6 +30,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onVideoUpload, className 
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
+      console.log("File dropped:", file.name, "Type:", file.type, "Size:", file.size);
       if (validateVideoFile(file)) {
         onVideoUpload(file);
       }
@@ -39,6 +40,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onVideoUpload, className 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      console.log("File selected:", file.name, "Type:", file.type, "Size:", file.size);
       if (validateVideoFile(file)) {
         onVideoUpload(file);
       }
@@ -47,6 +49,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onVideoUpload, className 
 
   const validateVideoFile = (file: File) => {
     if (!file.type.startsWith('video/')) {
+      console.error("Invalid file type:", file.type);
       toast({
         title: "Invalid file type",
         description: "Please upload a video file (MP4, WebM, etc.)",
@@ -54,6 +57,20 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onVideoUpload, className 
       });
       return false;
     }
+    
+    // Check for file size limit (500MB)
+    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+    if (file.size > MAX_FILE_SIZE) {
+      console.error("File too large:", file.size, "bytes");
+      toast({
+        title: "File too large",
+        description: "Please upload a video file smaller than 500MB",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    console.log("Video file validated successfully");
     return true;
   };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +28,7 @@ const Index = () => {
 
   // Handle video file upload
   const handleVideoUpload = async (file: File) => {
+    console.log("Video upload started:", file.name, "Size:", file.size);
     const url = URL.createObjectURL(file);
     setVideoFile(file);
     setVideoUrl(url);
@@ -40,20 +40,25 @@ const Index = () => {
     video.src = url;
     video.onloadedmetadata = () => {
       setVideoDuration(video.duration);
+      console.log("Video duration set:", video.duration);
     };
     
     // Start transcription process
     setIsTranscribing(true);
     setTranscript([]);
+    console.log("Starting transcription process");
     
     try {
+      console.log("Calling transcribeVideo service with file:", file.name);
       const result = await transcribeVideo(file);
+      console.log("Transcription completed successfully:", result.length, "segments");
       setTranscript(result);
       toast({
         title: "Transcription complete",
         description: "Your video has been successfully transcribed.",
       });
     } catch (error) {
+      console.error("Transcription error:", error);
       toast({
         title: "Transcription failed",
         description: "There was an error transcribing your video. Please try again.",
@@ -61,6 +66,7 @@ const Index = () => {
       });
     } finally {
       setIsTranscribing(false);
+      console.log("Transcription process finished");
     }
   };
 
@@ -135,6 +141,11 @@ const Index = () => {
       description: "Your trimmed video is being downloaded.",
     });
   };
+
+  // Effect to monitor transcript state changes
+  useEffect(() => {
+    console.log("Transcript state updated, segments:", transcript.length);
+  }, [transcript]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
