@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, forwardRef, ForwardedRef } from 'react';
 import { 
   Play, Pause, Volume2, VolumeX, 
   SkipBack, SkipForward, Maximize, 
@@ -17,14 +17,14 @@ interface VideoPlayerProps {
   onDownload?: () => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ 
+const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({ 
   videoSrc, 
   className,
   startTime,
   endTime,
   onDownload
-}) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+}, ref) => {
+  const internalVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -32,17 +32,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Use the forwarded ref if provided, otherwise fall back to internal ref
+  const videoRef = ref || internalVideoRef;
 
   // Initialize video with start time if provided
   useEffect(() => {
-    if (videoRef.current && startTime !== undefined) {
+    if (videoRef && 'current' in videoRef && videoRef.current && startTime !== undefined) {
       videoRef.current.currentTime = startTime;
     }
-  }, [startTime, videoSrc]);
+  }, [startTime, videoSrc, videoRef]);
 
   // Set up event listeners
   useEffect(() => {
-    const videoElement = videoRef.current;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
     if (!videoElement) return;
 
     const handleTimeUpdate = () => {
@@ -82,7 +88,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       videoElement.removeEventListener('pause', handlePause);
       videoElement.removeEventListener('volumechange', handleVolumeChange);
     };
-  }, [endTime]);
+  }, [endTime, ref]);
 
   // Handle fullscreen changes
   useEffect(() => {
@@ -97,62 +103,86 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   const togglePlay = () => {
-    if (!videoRef.current) return;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
+    if (!videoElement) return;
     
     if (isPlaying) {
-      videoRef.current.pause();
+      videoElement.pause();
     } else {
-      videoRef.current.play();
+      videoElement.play();
     }
   };
 
   const toggleMute = () => {
-    if (!videoRef.current) return;
-    videoRef.current.muted = !isMuted;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
+    if (!videoElement) return;
+    videoElement.muted = !isMuted;
   };
 
   const handleVolumeChange = (value: number[]) => {
-    if (!videoRef.current) return;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
+    if (!videoElement) return;
     const newVolume = value[0];
-    videoRef.current.volume = newVolume;
+    videoElement.volume = newVolume;
     
     if (newVolume === 0) {
-      videoRef.current.muted = true;
+      videoElement.muted = true;
     } else if (isMuted) {
-      videoRef.current.muted = false;
+      videoElement.muted = false;
     }
   };
 
   const handleSeek = (value: number[]) => {
-    if (!videoRef.current) return;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
+    if (!videoElement) return;
     
     const newTime = value[0];
     
     // If we have a defined trim range, constrain seeking within that range
     if (startTime !== undefined && endTime !== undefined) {
       if (newTime < startTime) {
-        videoRef.current.currentTime = startTime;
+        videoElement.currentTime = startTime;
       } else if (newTime > endTime) {
-        videoRef.current.currentTime = endTime;
+        videoElement.currentTime = endTime;
       } else {
-        videoRef.current.currentTime = newTime;
+        videoElement.currentTime = newTime;
       }
     } else {
-      videoRef.current.currentTime = newTime;
+      videoElement.currentTime = newTime;
     }
   };
 
   const skipBackward = () => {
-    if (!videoRef.current) return;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
+    if (!videoElement) return;
     const newTime = Math.max(currentTime - 5, startTime || 0);
-    videoRef.current.currentTime = newTime;
+    videoElement.currentTime = newTime;
   };
 
   const skipForward = () => {
-    if (!videoRef.current) return;
+    const videoElement = ref ? 
+      (ref as React.RefObject<HTMLVideoElement>).current : 
+      internalVideoRef.current;
+      
+    if (!videoElement) return;
     const maxTime = endTime || duration;
     const newTime = Math.min(currentTime + 5, maxTime);
-    videoRef.current.currentTime = newTime;
+    videoElement.currentTime = newTime;
   };
 
   const toggleFullscreen = () => {
@@ -187,7 +217,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     >
       {/* Video Element */}
       <video 
-        ref={videoRef}
+        ref={ref || internalVideoRef}
         src={videoSrc}
         className="w-full h-auto"
         onClick={togglePlay}
@@ -294,6 +324,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
     </div>
   );
-};
+});
+
+VideoPlayer.displayName = 'VideoPlayer';
 
 export default VideoPlayer;
