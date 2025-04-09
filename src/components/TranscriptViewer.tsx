@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Timestamp } from '@/types/transcript';
@@ -8,7 +8,7 @@ interface TranscriptViewerProps {
   transcript: Timestamp[];
   onTimestampClick: (timestamp: number) => void;
   currentTime?: number;
-  selectedSegment?: { start: number; end: number };
+  selectedSegment?: { start: number; end: number } | null;
   onSegmentSelect?: (segment: { start: number; end: number } | null) => void;
   className?: string;
 }
@@ -26,6 +26,14 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+
+  // Log when component receives new transcript data
+  useEffect(() => {
+    console.log("TranscriptViewer received transcript data:", transcript.length, "segments");
+    if (transcript.length > 0) {
+      console.log("First segment in TranscriptViewer:", JSON.stringify(transcript[0]));
+    }
+  }, [transcript]);
 
   // Determine if a timestamp is within the current playing time (for highlighting)
   const isCurrentTimestamp = (start: number, end: number) => {
@@ -65,7 +73,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       
       <ScrollArea className="h-[500px] transcript-container">
         <div className="p-4 space-y-2">
-          {transcript.length > 0 ? (
+          {transcript && transcript.length > 0 ? (
             transcript.map((item, index) => (
               <div 
                 key={index}

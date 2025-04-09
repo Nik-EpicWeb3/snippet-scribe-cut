@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,14 +46,25 @@ const Index = () => {
     
     // Start transcription process
     setIsTranscribing(true);
-    setTranscript([]);
+    setTranscript([]); // Clear existing transcript
     console.log("Starting transcription process");
     
     try {
       console.log("Calling transcribeVideo service with file:", file.name);
       const result = await transcribeVideo(file);
       console.log("Transcription completed successfully:", result.length, "segments");
-      setTranscript(result);
+      // Debug the received transcript data
+      console.log("Transcript data:", JSON.stringify(result.slice(0, 2)));
+      
+      // Ensure we have valid transcript data before updating state
+      if (Array.isArray(result) && result.length > 0) {
+        setTranscript(result);
+        console.log("Transcript state updated with data:", result.length, "segments");
+      } else {
+        console.error("Received invalid transcript data:", result);
+        throw new Error("Invalid transcript data received");
+      }
+      
       toast({
         title: "Transcription complete",
         description: "Your video has been successfully transcribed.",
@@ -66,7 +78,7 @@ const Index = () => {
       });
     } finally {
       setIsTranscribing(false);
-      console.log("Transcription process finished");
+      console.log("Transcription process finished, isTranscribing set to false");
     }
   };
 
@@ -145,7 +157,18 @@ const Index = () => {
   // Effect to monitor transcript state changes
   useEffect(() => {
     console.log("Transcript state updated, segments:", transcript.length);
+    if (transcript.length > 0) {
+      console.log("First segment:", JSON.stringify(transcript[0]));
+    }
   }, [transcript]);
+
+  // Effect to ensure the transcript tab is active after transcription
+  useEffect(() => {
+    if (!isTranscribing && transcript.length > 0) {
+      setActiveTab('transcript');
+      console.log("Transcript ready, setting active tab to transcript");
+    }
+  }, [isTranscribing, transcript]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -231,13 +254,16 @@ const Index = () => {
                       </CardContent>
                     </Card>
                   ) : (
-                    <TranscriptViewer 
-                      transcript={transcript}
-                      onTimestampClick={handleTimestampClick}
-                      currentTime={currentTime}
-                      selectedSegment={selectedSegment}
-                      onSegmentSelect={handleSegmentSelect}
-                    />
+                    <>
+                      {console.log("Rendering TranscriptViewer with", transcript.length, "segments")}
+                      <TranscriptViewer 
+                        transcript={transcript}
+                        onTimestampClick={handleTimestampClick}
+                        currentTime={currentTime}
+                        selectedSegment={selectedSegment}
+                        onSegmentSelect={handleSegmentSelect}
+                      />
+                    </>
                   )}
                 </TabsContent>
                 
