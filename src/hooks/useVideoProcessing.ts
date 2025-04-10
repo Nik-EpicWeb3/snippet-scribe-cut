@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { transcribeVideo, trimVideo, downloadTrimmedVideo } from '@/services/videoService';
+import { transcribeVideoWithWhisper, getOpenAIApiKey } from '@/services/openaiService';
 import { Timestamp } from '@/types/transcript';
 
 export const useVideoProcessing = () => {
@@ -15,6 +16,7 @@ export const useVideoProcessing = () => {
   const [trimmedVideoUrl, setTrimmedVideoUrl] = useState<string>('');
   const [insights, setInsights] = useState<Timestamp[]>([]);
   const [activeTab, setActiveTab] = useState('transcript');
+  const [useAI, setUseAI] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
@@ -42,18 +44,22 @@ export const useVideoProcessing = () => {
     console.log("Starting transcription process");
     
     try {
-      console.log("Calling transcribeVideo service with file:", file.name);
-      const result = await transcribeVideo(file);
-      console.log("Transcription completed successfully with result:", result ? result.length : 0, "segments");
-      console.log("Result data type:", typeof result);
-      console.log("Result is array?", Array.isArray(result));
+      let result: Timestamp[] = [];
+      const hasOpenAIKey = !!getOpenAIApiKey();
       
-      // Debug the received transcript data
-      if (result && result.length > 0) {
-        console.log("First segment of result:", JSON.stringify(result[0]));
+      if (useAI && hasOpenAIKey) {
+        console.log("Using OpenAI for transcription");
+        toast({
+          title: "AI Transcription Started",
+          description: "Using OpenAI to transcribe your video...",
+        });
+        result = await transcribeVideoWithWhisper(file);
       } else {
-        console.log("No segments in result");
+        console.log("Using mock transcription service");
+        result = await transcribeVideo(file);
       }
+      
+      console.log("Transcription completed successfully with result:", result ? result.length : 0, "segments");
       
       // Force the component to recognize the new data by creating a new array
       setTranscript([...result]);
@@ -67,7 +73,7 @@ export const useVideoProcessing = () => {
       console.error("Transcription error:", error);
       toast({
         title: "Transcription failed",
-        description: "There was an error transcribing your video. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error transcribing your video. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -150,12 +156,15 @@ export const useVideoProcessing = () => {
     });
   };
 
+  // Set useAI based on API key availability
+  useEffect(() => {
+    const hasApiKey = !!getOpenAIApiKey();
+    setUseAI(hasApiKey);
+  }, []);
+
   // Effect to monitor transcript state changes
   useEffect(() => {
     console.log("Transcript state updated in Index component, segments:", transcript.length);
-    if (transcript.length > 0) {
-      console.log("First segment in Index state:", JSON.stringify(transcript[0]));
-    }
   }, [transcript]);
 
   // Effect to ensure the transcript tab is active after transcription
@@ -177,6 +186,8 @@ export const useVideoProcessing = () => {
     trimmedVideoUrl,
     insights,
     activeTab,
+    useAI,
+    setUseAI,
     videoRef,
     setActiveTab,
     handleVideoUpload,

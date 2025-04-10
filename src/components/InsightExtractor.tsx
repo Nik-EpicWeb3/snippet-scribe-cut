@@ -3,9 +3,12 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Scissors } from 'lucide-react';
+import { Search, Scissors, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Timestamp } from '@/types/transcript';
+import { extractInsightsWithGPT, getOpenAIApiKey } from '@/services/openaiService';
+import { useToast } from '@/components/ui/use-toast';
+import OpenAISetup from './OpenAISetup';
 
 interface InsightExtractorProps {
   transcript: Timestamp[];
@@ -23,30 +26,44 @@ const InsightExtractor: React.FC<InsightExtractorProps> = ({
   const [prompt, setPrompt] = useState('');
   const [insights, setInsights] = useState<Timestamp[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [useAI, setUseAI] = useState(true);
+  const { toast } = useToast();
 
-  // Demo function to simulate insight extraction based on a prompt
-  // In a real implementation, this would call an AI service
-  const extractInsights = () => {
+  // Check if OpenAI API key is available
+  const hasApiKey = !!getOpenAIApiKey();
+
+  // Extract insights based on the prompt
+  const extractInsights = async () => {
+    if (!prompt.trim()) return;
+    
     setIsLoading(true);
     
-    // Simulate API delay
-    setTimeout(() => {
-      // For demo purposes, just filter segments containing the prompt text (case insensitive)
-      if (prompt.trim()) {
+    try {
+      let extractedInsights: Timestamp[] = [];
+      
+      if (useAI && hasApiKey) {
+        // Use OpenAI to extract insights
+        extractedInsights = await extractInsightsWithGPT(transcript, prompt);
+      } else {
+        // Fallback to simple keyword matching
         const searchTerm = prompt.toLowerCase();
-        const extractedInsights = transcript.filter(segment => 
+        extractedInsights = transcript.filter(segment => 
           segment.text.toLowerCase().includes(searchTerm)
         );
-        
-        setInsights(extractedInsights);
-        onExtract(extractedInsights);
-      } else {
-        setInsights([]);
-        onExtract([]);
       }
       
+      setInsights(extractedInsights);
+      onExtract(extractedInsights);
+    } catch (error) {
+      console.error("Error extracting insights:", error);
+      toast({
+        title: "Error extracting insights",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -66,31 +83,82 @@ const InsightExtractor: React.FC<InsightExtractorProps> = ({
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  if (!hasApiKey && useAI) {
+    return (
+      <div className={cn('rounded-lg border bg-card shadow-sm', className)}>
+        <div className="p-4 border-b">
+          <h3 className="text-lg font-semibold">Extract Insights with AI</h3>
+          <p className="text-sm text-muted-foreground">
+            Set up your OpenAI API key to unlock AI-powered insight extraction
+          </p>
+        </div>
+        
+        <div className="p-4">
+          <OpenAISetup />
+          <div className="mt-4 text-center">
+            <Button variant="outline" onClick={() => setUseAI(false)}>
+              Continue without AI
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn('rounded-lg border bg-card shadow-sm', className)}>
       <div className="p-4 border-b">
-        <h3 className="text-lg font-semibold">Extract Insights</h3>
+        <h3 className="text-lg font-semibold">
+          {useAI && hasApiKey ? 'Extract Insights with AI' : 'Extract Insights'}
+        </h3>
         <p className="text-sm text-muted-foreground">
-          Enter a prompt to find relevant moments in the video
+          {useAI && hasApiKey 
+            ? 'Use AI to find relevant moments based on your prompt'
+            : 'Search through the transcript to find relevant moments'
+          }
         </p>
       </div>
       
       <div className="p-4">
         <Textarea
-          placeholder="Enter a search term or prompt, e.g., 'key takeaways', 'project updates', etc."
+          placeholder={useAI && hasApiKey 
+            ? "Enter a prompt like 'main arguments', 'key takeaways', or 'action items'"
+            : "Enter a search term to find in the transcript"
+          }
           value={prompt}
           onChange={handlePromptChange}
           className="mb-3 min-h-[100px]"
         />
         
-        <Button 
-          onClick={extractInsights} 
-          disabled={!prompt.trim() || isLoading || transcript.length === 0}
-          className="w-full"
-        >
-          {isLoading ? 'Processing...' : 'Extract Insights'}
-          {isLoading ? null : <Search className="ml-2 h-4 w-4" />}
-        </Button>
+        <div className="flex gap-2 w-full mb-3">
+          <Button 
+            onClick={extractInsights} 
+            disabled={!prompt.trim() || isLoading || transcript.length === 0}
+            className="flex-1"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {useAI && hasApiKey ? 'Processing with AI...' : 'Searching...'}
+              </>
+            ) : (
+              <>
+                {useAI && hasApiKey ? 'Extract with AI' : 'Search Transcript'}
+                <Search className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+          
+          {hasApiKey && (
+            <Button 
+              variant="outline" 
+              onClick={() => setUseAI(!useAI)}
+              className="whitespace-nowrap"
+            >
+              {useAI ? 'Use Simple Search' : 'Use AI'}
+            </Button>
+          )}
+        </div>
         
         {insights.length > 0 && (
           <div className="mt-4">
