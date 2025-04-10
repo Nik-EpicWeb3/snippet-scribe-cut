@@ -1,4 +1,3 @@
-
 import { Timestamp } from '@/types/transcript';
 
 /**
@@ -75,7 +74,11 @@ export const transcribeVideo = async (file: File): Promise<Timestamp[]> => {
     }
   ];
   
-  console.log("Mock transcription completed successfully with", mockTranscript.length, "segments");
+  console.log("Mock transcription service created transcript with", mockTranscript.length, "segments");
+  console.log("Mock transcription first segment:", JSON.stringify(mockTranscript[0]));
+  console.log("Mock transcription data type:", typeof mockTranscript);
+  console.log("Mock transcription data is array?", Array.isArray(mockTranscript));
+  
   return mockTranscript;
 };
 

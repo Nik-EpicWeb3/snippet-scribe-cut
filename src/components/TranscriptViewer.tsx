@@ -29,9 +29,14 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Log when component receives new transcript data
   useEffect(() => {
-    console.log("TranscriptViewer received transcript data:", transcript?.length, "segments");
+    console.log("TranscriptViewer received transcript data:", transcript ? transcript.length : 0, "segments");
+    console.log("TranscriptViewer transcript data type:", typeof transcript);
+    console.log("TranscriptViewer transcript data is array?", Array.isArray(transcript));
+    
     if (transcript && transcript.length > 0) {
       console.log("First segment in TranscriptViewer:", JSON.stringify(transcript[0]));
+    } else {
+      console.log("No transcript segments available in TranscriptViewer");
     }
   }, [transcript]);
 
@@ -61,6 +66,9 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     onTimestampClick(start);
   };
 
+  // Check if transcript is valid for rendering
+  const hasValidTranscript = transcript && Array.isArray(transcript) && transcript.length > 0;
+
   return (
     <div className={cn('rounded-lg border bg-card shadow-sm', className)}>
       <div className="p-4 border-b">
@@ -73,7 +81,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       
       <ScrollArea className="h-[500px] transcript-container">
         <div className="p-4 space-y-2">
-          {transcript && transcript.length > 0 ? (
+          {hasValidTranscript ? (
             transcript.map((item, index) => (
               <div 
                 key={index}
