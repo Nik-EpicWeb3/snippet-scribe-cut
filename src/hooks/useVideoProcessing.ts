@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { transcribeVideo, trimVideo, downloadTrimmedVideo } from '@/services/videoService';
-import { transcribeVideoWithWhisper, getOpenAIApiKey } from '@/services/openaiService';
+import { transcribeVideoWithWhisper } from '@/services/openaiService';
 import { Timestamp } from '@/types/transcript';
 
 export const useVideoProcessing = () => {
@@ -45,7 +45,8 @@ export const useVideoProcessing = () => {
     
     try {
       let result: Timestamp[] = [];
-      const hasOpenAIKey = !!getOpenAIApiKey();
+      // For Supabase implementation, we always use AI transcription
+      const hasOpenAIKey = true;
       
       if (useAI && hasOpenAIKey) {
         console.log("Using OpenAI for transcription");
@@ -156,10 +157,9 @@ export const useVideoProcessing = () => {
     });
   };
 
-  // Set useAI based on API key availability
+  // For Supabase implementation, AI is always available
   useEffect(() => {
-    const hasApiKey = !!getOpenAIApiKey();
-    setUseAI(hasApiKey);
+    setUseAI(true);
   }, []);
 
   // Effect to monitor transcript state changes

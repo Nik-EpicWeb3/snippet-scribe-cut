@@ -5,9 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import InsightExtractor from '@/components/InsightExtractor';
 import VideoTrimmer from '@/components/VideoTrimmer';
-import OpenAISetup from '@/components/OpenAISetup';
+
 import { Timestamp } from '@/types/transcript';
-import { FileText, Sparkles, Scissors, Settings } from 'lucide-react';
+import { FileText, Sparkles, Scissors } from 'lucide-react';
 
 interface TranscriptSectionProps {
   videoUrl: string;
@@ -74,13 +74,6 @@ const TranscriptSection: React.FC<TranscriptSectionProps> = ({
               <Scissors className="h-4 w-4 mr-2" />
               Trim
             </TabsTrigger>
-            <TabsTrigger 
-              value="settings" 
-              className="flex-1 py-3 rounded-none data-[state=active]:bg-background"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              AI Setup
-            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="transcript" className="mt-0">
@@ -127,13 +120,6 @@ const TranscriptSection: React.FC<TranscriptSectionProps> = ({
             </Card>
           </TabsContent>
           
-          <TabsContent value="settings" className="mt-0">
-            <Card>
-              <CardContent className="p-4">
-                <OpenAISetup />
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       ) : (
         <EmptyState />

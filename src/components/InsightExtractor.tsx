@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Search, Scissors, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Timestamp } from '@/types/transcript';
-import { extractInsightsWithGPT, getOpenAIApiKey } from '@/services/openaiService';
+import { extractInsightsWithGPT } from '@/services/openaiService';
 import { useToast } from '@/components/ui/use-toast';
-import OpenAISetup from './OpenAISetup';
+
 
 interface InsightExtractorProps {
   transcript: Timestamp[];
@@ -29,8 +29,8 @@ const InsightExtractor: React.FC<InsightExtractorProps> = ({
   const [useAI, setUseAI] = useState(true);
   const { toast } = useToast();
 
-  // Check if OpenAI API key is available
-  const hasApiKey = !!getOpenAIApiKey();
+  // For the Supabase implementation, we assume API key is always available
+  const hasApiKey = true;
 
   // Extract insights based on the prompt
   const extractInsights = async () => {
@@ -83,27 +83,6 @@ const InsightExtractor: React.FC<InsightExtractorProps> = ({
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  if (!hasApiKey && useAI) {
-    return (
-      <div className={cn('rounded-lg border bg-card shadow-sm', className)}>
-        <div className="p-4 border-b">
-          <h3 className="text-lg font-semibold">Extract Insights with AI</h3>
-          <p className="text-sm text-muted-foreground">
-            Set up your OpenAI API key to unlock AI-powered insight extraction
-          </p>
-        </div>
-        
-        <div className="p-4">
-          <OpenAISetup />
-          <div className="mt-4 text-center">
-            <Button variant="outline" onClick={() => setUseAI(false)}>
-              Continue without AI
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={cn('rounded-lg border bg-card shadow-sm', className)}>
