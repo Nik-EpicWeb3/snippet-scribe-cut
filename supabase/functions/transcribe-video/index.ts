@@ -26,9 +26,25 @@ serve(async (req) => {
       throw new Error('No file provided');
     }
 
+    // Check file format and convert if needed
+    const supportedFormats = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    
+    let processedFile = file;
+    
+    // If it's a MOV file, we need to rename it to MP4 since MOV is essentially MP4
+    if (fileExtension === 'mov') {
+      const fileBuffer = await file.arrayBuffer();
+      processedFile = new File([fileBuffer], file.name.replace(/\.mov$/i, '.mp4'), {
+        type: 'video/mp4'
+      });
+    } else if (fileExtension && !supportedFormats.includes(fileExtension)) {
+      throw new Error(`Unsupported file format: .${fileExtension}. Supported formats: ${supportedFormats.join(', ')}`);
+    }
+
     // Create form data for OpenAI API
     const openaiFormData = new FormData();
-    openaiFormData.append('file', file);
+    openaiFormData.append('file', processedFile);
     openaiFormData.append('model', 'whisper-1');
     openaiFormData.append('response_format', 'verbose_json');
     openaiFormData.append('timestamp_granularities', '["segment"]');
