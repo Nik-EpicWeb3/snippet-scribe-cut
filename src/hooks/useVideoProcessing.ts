@@ -120,8 +120,13 @@ export const useVideoProcessing = () => {
   // Handle video trimming
   const handleTrim = async (start: number, end: number) => {
     try {
-      const trimmedUrl = await trimVideo(videoUrl, start, end);
-      setTrimmedVideoUrl(trimmedUrl);
+      // For server-side trimming, we need the original file
+      if (videoFile) {
+        const trimmedUrl = await trimVideo(videoFile, start, end);
+        setTrimmedVideoUrl(trimmedUrl);
+      } else {
+        throw new Error('Original video file not available for trimming');
+      }
       
       toast({
         title: "Video trimmed",
@@ -130,7 +135,7 @@ export const useVideoProcessing = () => {
     } catch (error) {
       toast({
         title: "Trimming failed",
-        description: "There was an error trimming your video. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error trimming your video. Please try again.",
         variant: "destructive",
       });
     }
@@ -138,15 +143,13 @@ export const useVideoProcessing = () => {
 
   // Handle download of trimmed video
   const handleDownload = async () => {
-    if (!selectedSegment) return;
+    if (!selectedSegment || !videoFile) return;
     
-    const filename = videoFile ? 
-      `trimmed-${videoFile.name}` : 
-      "trimmed-video.mp4";
+    const filename = `trimmed-${videoFile.name}`;
       
     try {
       await downloadTrimmedVideo(
-        videoUrl, 
+        videoFile, 
         selectedSegment.start, 
         selectedSegment.end, 
         filename

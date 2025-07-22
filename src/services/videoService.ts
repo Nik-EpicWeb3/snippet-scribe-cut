@@ -83,9 +83,20 @@ export const transcribeVideo = async (file: File): Promise<Timestamp[]> => {
 };
 
 /**
- * Create a trimmed video using browser APIs and return a blob URL
+ * Server-side video trimming using FFmpeg (recommended)
+ * This preserves original quality and ensures proper A/V sync
  */
-export const trimVideo = async (videoUrl: string, startTime: number, endTime: number): Promise<string> => {
+export const trimVideo = async (videoFile: File, startTime: number, endTime: number): Promise<string> => {
+  // Import the server-side trimming service
+  const { trimVideoServerSide } = await import('./trimService');
+  return trimVideoServerSide(videoFile, startTime, endTime);
+};
+
+/**
+ * Client-side video trimming (fallback - may have sync issues)
+ * @deprecated Use trimVideo (server-side) for better quality and sync
+ */
+export const trimVideoClientSide = async (videoUrl: string, startTime: number, endTime: number): Promise<string> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
@@ -162,7 +173,7 @@ export const trimVideo = async (videoUrl: string, startTime: number, endTime: nu
  * Download a trimmed video segment
  */
 export const downloadTrimmedVideo = async (
-  videoUrl: string, 
+  videoFile: File | string, 
   startTime: number, 
   endTime: number, 
   filename: string
@@ -170,23 +181,36 @@ export const downloadTrimmedVideo = async (
   try {
     console.log(`Creating trimmed video from ${startTime}s to ${endTime}s`);
     
-    // Create a trimmed video blob
-    const trimmedUrl = await trimVideo(videoUrl, startTime, endTime);
+    let trimmedUrl: string;
     
-    // Create download link
-    const link = document.createElement('a');
-    link.href = trimmedUrl;
-    link.download = filename.replace(/\.(mp4|mov|avi|mkv)$/i, '.webm');
+    if (videoFile instanceof File) {
+      // Server-side trimming with original file
+      trimmedUrl = await trimVideo(videoFile, startTime, endTime);
+    } else {
+      // Fallback to client-side trimming with URL
+      console.warn('Using client-side trimming (may have sync issues). Consider passing original File for better quality.');
+      trimmedUrl = await trimVideoClientSide(videoFile, startTime, endTime);
+    }
     
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up the blob URL after a delay
-    setTimeout(() => {
-      URL.revokeObjectURL(trimmedUrl);
-    }, 1000);
+    // Import and use server-side download if we have a server-generated URL
+    if (videoFile instanceof File) {
+      const { downloadTrimmedVideoServerSide } = await import('./trimService');
+      await downloadTrimmedVideoServerSide(trimmedUrl, filename);
+    } else {
+      // Client-side download for fallback
+      const link = document.createElement('a');
+      link.href = trimmedUrl;
+      link.download = filename.replace(/\.(mp4|mov|avi|mkv)$/i, '.webm');
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL after a delay
+      setTimeout(() => {
+        URL.revokeObjectURL(trimmedUrl);
+      }, 1000);
+    }
     
     console.log(`Download initiated for ${filename}`);
   } catch (error) {

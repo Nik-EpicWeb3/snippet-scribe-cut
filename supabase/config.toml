@@ -61,6 +61,9 @@ verify_jwt = false
 [functions.extract-insights]
 verify_jwt = false
 
+[functions.trim-video]
+verify_jwt = false
+
 [realtime]
 enabled = true
 port = 54323
