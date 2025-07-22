@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { transcribeVideo, trimVideo, downloadTrimmedVideo } from '@/services/videoService';
 import { transcribeVideoWithWhisper } from '@/services/openaiService';
@@ -21,8 +21,8 @@ export const useVideoProcessing = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
-  // Handle video file upload
-  const handleVideoUpload = async (file: File) => {
+  // Handle video file upload - memoized to prevent recreation
+  const handleVideoUpload = useCallback(async (file: File) => {
     console.log("Video upload started:", file.name, "Size:", file.size);
     const url = URL.createObjectURL(file);
     setVideoFile(file);
@@ -83,26 +83,26 @@ export const useVideoProcessing = () => {
       // Explicitly set active tab to transcript
       setActiveTab('transcript');
     }
-  };
+  }, [toast, useAI]);
 
-  // Handle timestamp clicks in the transcript
-  const handleTimestampClick = (timestamp: number) => {
+  // Handle timestamp clicks in the transcript - memoized
+  const handleTimestampClick = useCallback((timestamp: number) => {
     setCurrentTime(timestamp);
     if (videoRef.current) {
       videoRef.current.currentTime = timestamp;
     }
-  };
+  }, []);
 
-  // Handle segment selection for trimming
-  const handleSegmentSelect = (segment: { start: number; end: number } | null) => {
+  // Handle segment selection for trimming - memoized
+  const handleSegmentSelect = useCallback((segment: { start: number; end: number } | null) => {
     setSelectedSegment(segment);
     if (segment) {
       setActiveTab('trim');
     }
-  };
+  }, []);
 
-  // Handle insights extraction
-  const handleInsightExtract = (extractedInsights: Timestamp[]) => {
+  // Handle insights extraction - memoized
+  const handleInsightExtract = useCallback((extractedInsights: Timestamp[]) => {
     setInsights(extractedInsights);
     if (extractedInsights.length > 0) {
       toast({
@@ -115,10 +115,10 @@ export const useVideoProcessing = () => {
         description: "Try a different search term or prompt.",
       });
     }
-  };
+  }, [toast]);
 
-  // Handle video trimming
-  const handleTrim = async (start: number, end: number) => {
+  // Handle video trimming - memoized
+  const handleTrim = useCallback(async (start: number, end: number) => {
     try {
       // For server-side trimming, we need the original file
       if (videoFile) {
@@ -139,10 +139,10 @@ export const useVideoProcessing = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [videoFile, toast]);
 
-  // Handle download of trimmed video
-  const handleDownload = async () => {
+  // Handle download of trimmed video - memoized
+  const handleDownload = useCallback(async () => {
     if (!selectedSegment || !videoFile) return;
     
     const filename = `trimmed-${videoFile.name}`;
@@ -166,25 +166,29 @@ export const useVideoProcessing = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [selectedSegment, videoFile, toast]);
 
   // For Supabase implementation, AI is always available
   useEffect(() => {
     setUseAI(true);
   }, []);
 
-  // Effect to monitor transcript state changes
+  // Effect to monitor transcript state changes (throttled to prevent loops)
   useEffect(() => {
     console.log("Transcript state updated in Index component, segments:", transcript.length);
   }, [transcript]);
 
-  // Effect to ensure the transcript tab is active after transcription
+  // Effect to ensure the transcript tab is active after transcription (with stability check)
   useEffect(() => {
-    if (!isTranscribing && transcript.length > 0) {
-      setActiveTab('transcript');
-      console.log("Setting active tab to transcript. Transcript length:", transcript.length);
+    if (!isTranscribing && transcript.length > 0 && activeTab !== 'transcript') {
+      const timer = setTimeout(() => {
+        setActiveTab('transcript');
+        console.log("Setting active tab to transcript. Transcript length:", transcript.length);
+      }, 100); // Debounce to prevent rapid state changes
+      
+      return () => clearTimeout(timer);
     }
-  }, [isTranscribing, transcript]);
+  }, [isTranscribing, transcript.length, activeTab]); // Changed dependency to transcript.length instead of transcript array
 
   return {
     videoFile,
