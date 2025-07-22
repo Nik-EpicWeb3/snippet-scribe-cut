@@ -18,6 +18,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let inputPath = '';
+  let outputPath = '';
+  
   try {
     const { videoFile, startTime, endTime, outputFilename } = await req.json();
     
@@ -33,24 +36,52 @@ serve(async (req) => {
     // Generate unique filenames
     const inputFilename = `input_${Date.now()}.mp4`;
     const trimmedFilename = outputFilename || `trimmed_${Date.now()}.mp4`;
+    inputPath = `/tmp/${inputFilename}`;
+    outputPath = `/tmp/${trimmedFilename}`;
     
     // Write input file to temporary location
-    await Deno.writeFile(`/tmp/${inputFilename}`, videoBuffer);
+    await Deno.writeFile(inputPath, videoBuffer);
     
     // Calculate duration for FFmpeg
     const duration = endTime - startTime;
     
-    // FFmpeg command with proper flags to preserve sync and quality
+    // Get frame rate from input video for proper sync
+    const frameRateProcess = new Deno.Command('ffprobe', {
+      args: [
+        '-v', '0',
+        '-of', 'csv=p=0',
+        '-select_streams', 'v:0',
+        '-show_entries', 'stream=r_frame_rate',
+        inputPath
+      ],
+      stdout: 'piped',
+      stderr: 'piped'
+    });
+    
+    const { code: frCode, stdout: frStdout } = await frameRateProcess.output();
+    let frameRate = '30'; // Default fallback
+    
+    if (frCode === 0) {
+      const frOutput = new TextDecoder().decode(frStdout).trim();
+      if (frOutput && frOutput !== '0/0') {
+        frameRate = frOutput;
+      }
+    }
+    
+    // FFmpeg command with re-encode to fix A/V sync issues
     const ffmpegCommand = [
       'ffmpeg',
       '-y', // Overwrite output file
-      '-ss', startTime.toString(), // Start time (seeking before input for speed)
-      '-i', `/tmp/${inputFilename}`, // Input file
+      '-ss', startTime.toString(), // Start time
+      '-i', inputPath, // Input file
       '-t', duration.toString(), // Duration to trim
-      '-c', 'copy', // Stream copy (no re-encoding for quality preservation)
-      '-avoid_negative_ts', 'make_zero', // Fix timestamp issues
-      '-fflags', '+genpts', // Generate presentation timestamps
-      `-tmp/${trimmedFilename}`
+      '-vf', 'setpts=PTS-STARTPTS', // Reset video timestamps
+      '-af', 'asetpts=PTS-STARTPTS', // Reset audio timestamps
+      '-r', frameRate, // Preserve original frame rate
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', // Video encoding
+      '-c:a', 'aac', // Audio encoding
+      '-movflags', '+faststart', // Web optimization
+      outputPath
     ];
 
     console.log('Running FFmpeg command:', ffmpegCommand.join(' '));
@@ -71,7 +102,7 @@ serve(async (req) => {
     }
 
     // Read the trimmed video file
-    const trimmedVideoBuffer = await Deno.readFile(`/tmp/${trimmedFilename}`);
+    const trimmedVideoBuffer = await Deno.readFile(outputPath);
     
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -89,14 +120,6 @@ serve(async (req) => {
     const { data: urlData } = supabase.storage
       .from('video-processing')
       .getPublicUrl(trimmedFilename);
-
-    // Clean up temporary files
-    try {
-      await Deno.remove(`/tmp/${inputFilename}`);
-      await Deno.remove(`/tmp/${trimmedFilename}`);
-    } catch (cleanupError) {
-      console.warn('Failed to clean up temporary files:', cleanupError);
-    }
 
     console.log('Video trimming completed successfully');
 
@@ -123,5 +146,21 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+  } finally {
+    // Always clean up temporary files
+    if (inputPath) {
+      try {
+        await Deno.remove(inputPath);
+      } catch (cleanupError) {
+        console.warn('Failed to clean up input file:', cleanupError);
+      }
+    }
+    if (outputPath) {
+      try {
+        await Deno.remove(outputPath);
+      } catch (cleanupError) {
+        console.warn('Failed to clean up output file:', cleanupError);
+      }
+    }
   }
 });
