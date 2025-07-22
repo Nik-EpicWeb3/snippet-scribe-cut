@@ -83,33 +83,114 @@ export const transcribeVideo = async (file: File): Promise<Timestamp[]> => {
 };
 
 /**
- * Mock API call to trim a video.
- * In a real application, this would send the request to a backend service.
+ * Create a trimmed video using browser APIs and return a blob URL
  */
 export const trimVideo = async (videoUrl: string, startTime: number, endTime: number): Promise<string> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  console.log(`Trimming video from ${startTime}s to ${endTime}s`);
-  
-  // In a real implementation, this would return a new URL to the trimmed video
-  // For this mock, we just return the original URL
-  return videoUrl;
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.src = videoUrl;
+    
+    video.onloadedmetadata = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Set up MediaRecorder to capture the video
+      const stream = canvas.captureStream(30); // 30 FPS
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp9'
+      });
+      
+      const chunks: Blob[] = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const trimmedUrl = URL.createObjectURL(blob);
+        resolve(trimmedUrl);
+      };
+      
+      // Start recording
+      mediaRecorder.start();
+      
+      // Set video to start time
+      video.currentTime = startTime;
+      
+      let frameCount = 0;
+      const expectedFrames = Math.ceil((endTime - startTime) * 30); // 30 FPS
+      
+      const drawFrame = () => {
+        if (video.currentTime >= endTime || frameCount >= expectedFrames) {
+          mediaRecorder.stop();
+          return;
+        }
+        
+        ctx.drawImage(video, 0, 0);
+        frameCount++;
+        
+        // Advance video time slightly for next frame
+        video.currentTime = Math.min(startTime + (frameCount / 30), endTime);
+        
+        requestAnimationFrame(drawFrame);
+      };
+      
+      video.onseeked = () => {
+        drawFrame();
+      };
+    };
+    
+    video.onerror = () => {
+      reject(new Error('Failed to load video'));
+    };
+  });
 };
 
 /**
- * Mock function to download a trimmed video.
- * In a real application, this might create a file from a blob or redirect to a download URL.
+ * Download a trimmed video segment
  */
-export const downloadTrimmedVideo = (
+export const downloadTrimmedVideo = async (
   videoUrl: string, 
   startTime: number, 
   endTime: number, 
   filename: string
-): void => {
-  console.log(`Downloading trimmed video from ${startTime}s to ${endTime}s as ${filename}`);
-  
-  // In a real implementation, this would trigger a file download
-  // For this mock, we just log the action
-  alert(`In a production app, this would download a trimmed video from ${startTime}s to ${endTime}s as ${filename}`);
+): Promise<void> => {
+  try {
+    console.log(`Creating trimmed video from ${startTime}s to ${endTime}s`);
+    
+    // Create a trimmed video blob
+    const trimmedUrl = await trimVideo(videoUrl, startTime, endTime);
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.href = trimmedUrl;
+    link.download = filename.replace(/\.(mp4|mov|avi|mkv)$/i, '.webm');
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the blob URL after a delay
+    setTimeout(() => {
+      URL.revokeObjectURL(trimmedUrl);
+    }, 1000);
+    
+    console.log(`Download initiated for ${filename}`);
+  } catch (error) {
+    console.error('Error downloading trimmed video:', error);
+    throw new Error('Failed to create and download trimmed video');
+  }
 };

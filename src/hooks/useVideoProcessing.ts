@@ -137,24 +137,32 @@ export const useVideoProcessing = () => {
   };
 
   // Handle download of trimmed video
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!selectedSegment) return;
     
     const filename = videoFile ? 
       `trimmed-${videoFile.name}` : 
       "trimmed-video.mp4";
       
-    downloadTrimmedVideo(
-      videoUrl, 
-      selectedSegment.start, 
-      selectedSegment.end, 
-      filename
-    );
-    
-    toast({
-      title: "Download started",
-      description: "Your trimmed video is being downloaded.",
-    });
+    try {
+      await downloadTrimmedVideo(
+        videoUrl, 
+        selectedSegment.start, 
+        selectedSegment.end, 
+        filename
+      );
+      
+      toast({
+        title: "Download completed",
+        description: "Your trimmed video has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "There was an error downloading your video. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // For Supabase implementation, AI is always available
